@@ -1,0 +1,83 @@
+FROM debian:buster
+
+LABEL MAINTAINER="Mathis Charretier <matcharr@42.fr>"
+
+#====================# UPDATE SYSTEM #===#
+RUN         sed -i "s/main/main contrib non-free/g" /etc/apt/sources.list \
+            && apt-get update \
+            && apt-get install wget net-tools php php-fpm php-pear php-cgi php-common php-zip php-mbstring php-net-socket php-gd php-xml-util php-mysql php-gettext php-bcmath nginx \
+            && apt-get upgrade -y
+
+RUN         /srv/website 
+
+#====================# INSTALL PHPMYADMIN #====================#
+
+RUN         cd /tmp \
+            && wget https://files.phpmyadmin.net/phpMyAdmin/5.0.1/phpMyAdmin-5.0.1-all-languages.tar.gz \
+            && tar -xvf phpMyAdmin-5.0.1-all-languages.tar.gz \
+            && rm phpMyAdmin-5.0.1-all-languages.tar.gz \
+            && mv phpMyAdmin-5.0.1-all-languages/ /var/www/html/phpMyAdmin/
+
+#===================# INSTALL MYSQL #========================#
+COPY        srcs/create_database.sh /tmp
+
+RUN         DEBIAN_FRONTEND=noninteractive apt-get -y install default-mysql-server \
+            && service mysql start
+            && cd tmp \
+            && chmod +x create_database.sh \
+            && bash create_database.sh \
+            && rm create_database.sh \
+            && service mysql start
+
+#=================# INSTALL NGINX AND PHP-7.3 #============#
+
+COPY        srcs/create_cert.sh /etc/
+
+RUN         cd /etc \
+            && chmod +x create_cert.sh &&\
+            bash create_cert.sh
+
+#==================# INSTALL WORDPRESS #======================#
+
+RUN         cd tmp \
+            && wget wordpress.org/latest.tar.gz \
+            && tar latest.tar.gz \
+            && mv wordpress /var/www/htlm/ \
+            && cd /var/www/html/wordpress \
+            && mv* ../ \
+            && cd ../ \
+            && rm -rf wordpress \
+
+RUN         cd /var/www/html/ \
+            && rm -rf wp-config.php wp_settings.php
+
+COPY        srcs/wp-settings.php /var/www/html/
+
+COPY        srcs/wp-config.php /var/www/html/
+
+#===================# CONFIGURE #===================#
+
+COPY        srcs/ft_server.sql /tmp/
+
+COPY        srcs/import_database.sh /tmp/
+
+RUN         cd /tmp/ \
+            && chmod +x import_database.sh \
+            && bash import_database.sh \
+            && rm ft_server.sql \
+            && rm import_database.sh 
+
+RUN         cd /etc/nginx/sites-avaible/ \
+            && rm -rf default \
+            && cd /etc/nginx/sites-enabled/ \
+            && rm -rf default 
+
+COPY        srcs/start.sh /tmp/
+
+RUN         chmod +x /tmp/start.sh
+
+#=====================# OPEN PORT #===================#
+
+EXPOSE      80 443
+
+ENTRYPOINT ["/tmp/start.sh"]
