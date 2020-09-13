@@ -3,6 +3,8 @@
 Summary: This is a System Administration subject. You will discover Docker and you
 will set up your first web server.
 
+* Make sure that your docker app is running!!!
+
 > CMD build:<br>
  > `$> docker build .`<br>
  > CMD run:<br>
